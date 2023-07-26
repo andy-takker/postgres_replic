@@ -1,0 +1,66 @@
+version: "3.8"
+
+networks:
+  db_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 175.20.0.0/24
+
+services:
+  master_db:
+    build:
+      context: ./docker/master_db
+    ports:
+      - 5432:5432
+    container_name: master_db
+    restart: unless-stopped
+    volumes:
+      - postgres_data_master:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+      POSTGRES_REPLICATION_HOST: ${POSTGRES_REPLICATION_HOST:-175.20.0.3}
+    networks:
+      db_network:
+        ipv4_address: 175.20.0.2
+
+  slave_db:
+    depends_on:
+      - master_db
+    build:
+      context: ./docker/slave_db
+    ports:
+      - 5433:5432
+    container_name: slave_db
+    restart: unless-stopped
+    volumes:
+      - postgres_data_slave:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+    networks:
+      db_network:
+        ipv4_address: 175.20.0.3
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+    ports:
+      - 8000:80
+    networks:
+      db_network:
+        ipv4_address: 175.20.0.4
+
+volumes:
+  postgres_data_master:
+  postgres_data_slave:
